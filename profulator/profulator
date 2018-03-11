@@ -1,0 +1,75 @@
+#!/bin/bash
+#
+# Author: Grandt Ashworth (2018)
+# <mailto:git@grandtgruppe.com>
+#
+# Add the profulator to your ~/.bashrc
+#
+# If it's not working, check your syslogs
+#
+###############################################
+#
+# Derivations
+#
+###############################################
+#
+ProgName=$(basename $0)
+CowSay=$(which cowsay)
+FortuneCookie=$(which fortune)
+#
+###############################################
+#
+# Functions
+#
+###############################################
+#
+acmeLog(){
+	SEVERITY=$1
+	MESSAGE=$2
+	case $SEVERITY in
+		1)
+			PRIORITY=2
+		;;
+		2)
+			PRIORITY=4
+		;;
+		3)
+			PRIORITY=6
+		;;
+		*)
+			PRIORITY=7
+		;;
+	esac
+	logger -p ${PRIORITY} "${ProgName} ${MESSAGE}"
+}
+#
+checkEnv(){
+	[[ ! -x ${CowSay} ]] && {
+		acmeLog 1 "...found no cows to \"say\" with on $(hostname)... try installing \"cowsay\""
+		exit 1
+	}
+	[[ ! -x ${FortuneCookie} ]] && {
+		acmeLog 1 "...found no fortune cookies on $(hostname)... try installing \"fortune\""
+		exit 1
+	}
+}
+#
+randomSay(){
+	CowList=($(${CowSay} -l | grep -v usr))
+	RandomDate=$$$(date +%s)
+	RandomSelect=${CowList[$RandomDate % ${#CowList[@]} ]}
+	${CowSay} -f ${RandomSelect} <<<$(${FortuneCookie})
+	echo -e "\n"
+}
+#
+###############################################
+#
+# Mail Loop
+#
+###############################################
+#
+RUNLIST="checkEnv randomSay"
+#
+for RUN in $RUNLIST; do $RUN; done
+#
+###############################################
