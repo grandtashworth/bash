@@ -1,0 +1,190 @@
+#!/bin/bash
+#
+# Teleport files from one dimension to another
+#
+# Author: Grandt Ashworth 2016
+#
+##############################################################################
+#
+PROG=$(basename $0)
+LogFile=${PROG}.log
+#
+##############################################################################
+#
+# Input Parameters
+#
+##############################################################################
+#
+ArgCount=$#
+Folder=$1
+RemoteServer=$2
+RemoteFolder=$3
+Extension=$4
+#
+##############################################################################
+#
+LZ4=/usr/bin/lz4
+SCP=/usr/bin/scp
+RM="/bin/rm -f"
+SSH=/usr/bin/ssh
+CKSUM=/usr/bin/cksum
+#
+##############################################################################
+#
+# Functions
+#
+##############################################################################
+#
+logEvent(){
+        FUNCTION=$FUNCNAME
+        LOGLEVEL=$1
+        LOGMESSAGE=$2
+        case "$LOGLEVEL" in
+                1) LOGSTYLE="CRITICAL: "       ;;
+                2) LOGSTYLE="WARNING: "        ;;
+                3) LOGSTYLE="UNKNOWN: "        ;;
+                4) LOGSTYLE="OK: "             ;;
+                5) LOGSTYLE=":::DEBUG::: "     ;;
+                *) LOGSTYLE="" ;;
+        esac
+        echo -e "$(date +"%Y%m%d %H:%M:%S") - $LOGSTYLE $LOGMESSAGE"  | tee -a $LogFile
+}
+#
+progUsage(){
+	echo "##################################################################################################"
+	echo "#"
+	echo "# USAGE:"
+	echo "#"
+	echo "# [root@hostname ~/]# ./$PROG <From Path> <To Server> <To Path> <File Extension>"
+	echo "#"
+	echo "# EG: # ./${PROG} /server/data/captures $remoteserver /server/archive/captures pcap"
+	echo "#"
+	echo "##################################################################################################"
+	exit 0
+}
+#
+checkArgs(){
+        [ $ArgCount -lt 4 ] && {
+                progUsage
+        }
+        [ -z $Folder ] && {
+                progUsage
+        }
+        [ ! -d $Folder ] && {
+                prodUsage
+        }
+}
+#
+checkLz4(){
+	LZ4COUNT=$(rpm -qa | grep -c lz4)
+	[[ $LZ4COUNT -eq 0 ]] && {
+		logEvent 4 "$FUNCNAME - No LZ4 installed. Installing..."
+		yum -y install lz4 >/dev/null 2>&1
+	} || {
+		logEvent 4 "$FUNCNAME - LZ4 found."	
+	}
+}
+#
+zipFile(){
+        FILE=${1}
+	$LZ4 -9 ${Folder}/${FILE} ${Folder}/${FILE}.lz4 >/dev/null 2>&1
+	[[ $? -ne 0 ]] && {
+		logEvent 2 "$FUNCNAME - ${Folder}/${FILE} -> ${FILE}.lz4"
+	} || {
+		logEvent 4 "$FUNCNAME - ${Folder}/${FILE} -> ${FILE}.lz4"
+	}
+	
+}
+#
+generateLocalChecksum(){
+        FILE=${1}.lz4
+        LOCALCHECKSUM=$($CKSUM ${Folder}/${FILE} | awk '{print $1}')
+        [[ -z $LOCALCHECKSUM ]] && {
+                logEvent 2 "$FUNCNAME - ${Folder}/${FILE}"
+        } || {
+                logEvent 4 "$FUNCNAME - ${Folder}/${FILE} checksum: $LOCALCHECKSUM"
+        }
+}
+#
+syncFile(){
+        FILE=${1}.lz4
+	FolderStub=$(echo $Folder | awk -F"/" '{LAST=NF; print $LAST}')
+	$SSH $RemoteServer mkdir -p ${RemoteFolder}/${FolderStub} >/dev/null 2>&1
+	$SCP ${Folder}/${FILE} ${RemoteServer}:${RemoteFolder}/${FolderStub}/${FILE} >/dev/null 2>&1
+	[[ $? -ne 0 ]] && {
+                logEvent 2 "$FUNCNAME - ${Folder}/${FILE}"
+        } || {
+		REMOTECHECKSUM=$($SSH $RemoteServer $CKSUM ${RemoteFolder}/${FolderStub}/${FILE} | awk '{print $1}')
+		logEvent 4 "$FUNCNAME - ${RemoteFolder}/${FolderStub}/${FILE} checksum: $REMOTECHECKSUM"
+        }
+}
+#
+compareChecksum(){
+        FILE=${1}.lz4
+        [[ $LOCALCHECKSUM != $REMOTECHECKSUM ]] && {
+                logEvent 1 "$FUNCNAME - ${FILE} - local: $LOCALCHECKSUM remote: $REMOTECHECKSUM"
+        } || {
+                logEvent 4 "$FUNCNAME - ${FILE} - local: $LOCALCHECKSUM remote: $REMOTECHECKSUM"
+        }
+
+}
+#
+deleteUnzippedFile(){
+        FILE=${1}
+	$RM ${Folder}/${FILE}
+	[[ $? -ne 0 ]] && {
+		logEvent 2 "$FUNCNAME - ${Folder}/${FILE}"
+	} || {
+		logEvent 4 "$FUNCNAME - ${Folder}/${FILE}"
+	}
+}
+#
+deleteZippedFile(){
+        FILE=${1}.lz4
+	$RM ${Folder}/${FILE}
+	[[ $? -ne 0 ]] && {
+		logEvent 2 "$FUNCNAME - ${Folder}/${FILE}"
+	} || {
+		logEvent 4 "$FUNCNAME - ${Folder}/${FILE}"
+	}
+}
+#
+##############################################################################
+#
+mainLoop(){
+	FUNCTION=mainLoop
+	logEvent 4 "Starting..."
+	#
+	while true; do
+	####
+	cd $Folder
+	FILELIST=$(ls *.${Extension} 2>/dev/null)
+	#
+	[[ ! -z $FILELIST ]] && {
+		for EachFile in $FILELIST; do
+			logEvent 4 "...Processing: $EachFile"
+			RUNLIST="zipFile generateLocalChecksum syncFile compareChecksum deleteUnzippedFile deleteZippedFile"
+			for RUN in $RUNLIST; do
+				$RUN $EachFile
+			done
+		done
+	} || {
+		logEvent 4 "...Waiting for files..."
+		sleep 5
+	}
+	####
+	done
+}
+#
+##############################################################################
+#
+# Run Time
+#
+checkArgs
+checkLz4
+#
+mainLoop
+#
+##############################################################################
+#
+exit 0
