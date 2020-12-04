@@ -1,0 +1,115 @@
+#!/bin/bash
+#
+######################################################################
+#
+# Purpose:	Xray Sees Inside
+# Author:	Grandt Ashworth
+# Date:		12/2020
+#
+######################################################################
+#
+# Derivations and Declarations
+#
+######################################################################
+#
+declare -a _partitionlist=()
+#
+######################################################################
+#
+# Functions
+#
+######################################################################
+#
+__hostname(){
+	_hostname=$(hostname -s)
+	#
+	case $_hostname in
+		localhost)
+		exit 1
+		;;
+		*)
+		echo $_hostname
+		;;
+	esac
+}
+#
+__arch(){
+	_arch=$($(_arch=$(uname -m))
+		[[ ! -z $_arch ]] && { 
+			exit 1
+			} || { 
+			echo $($(which uname) -m)
+		})
+		exit_status=$?
+	[[ $exit_status -eq 0 ]] && {
+		echo $_arch
+	} || {
+		exit 1
+	}
+}
+#
+__kernel(){
+	_kernel=$($(_kernel=$(uname -r))
+		[[ ! -z $_kernel ]] && {
+			exit 1
+			} || {
+			echo $($(which uname) -r)
+		})
+		exit_status=$?
+	[[ $exit_status -eq 0 ]] && {
+		echo $_kernel
+	} || {
+		exit 1
+	}
+}
+#
+__memory(){
+	_memory="/proc/meminfo"
+		[[ -z $_memory ]] && {
+			exit 1
+			} || {
+			_totalmemory=$(cat $_memory|awk '/MemTotal:/{print $2}')
+			_totalmemoryfree=$(cat $_memory|awk '/MemFree:/{print $2}')
+			_totalmemoryavailable=$(cat $_memory|awk '/MemAvailable:/{print $2}')
+			_totalswap=$(cat $_memory|awk '/SwapTotal:/{print $2}')
+			_totalswapfree=$(cat $_memory|awk '/SwapFree:/{print $2}')
+			}
+			exit_status=$?
+	[[ $exit_status -eq 0 ]] && {
+		echo $_totalmemory $_totalmemoryfree $_totalmemoryavailable $_totalswap $_totalswapfree
+	} || {
+		exit 1
+	}
+}
+#
+#_partitions(){
+#	_partitions="/proc/partitions"
+#	[[ -z $_partitions ]] && {
+#		exit 1
+#		} || {
+#		_partitioncount=$(($(cat $_partitions| wc -l) -2))
+#		while [[ $_partitioncount -ne 0 ]] && {
+#			echo $_partitions | while read LABEL; do
+#				_partitionlist+=($LABEL)
+#				_partioncount=$(( $_partioncount - 1 ))
+#			done
+#		echo $_partitionlist
+#		}
+#	}
+#}
+#
+######################################################################
+#
+# Main Loop
+#
+######################################################################
+#
+RUNLIST="__hostname __arch __kernel __memory"
+#
+for RUN in $RUNLIST; do $RUN; done
+#
+######################################################################
+#
+# Housekeeping
+#
+######################################################################

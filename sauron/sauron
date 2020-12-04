@@ -1,0 +1,85 @@
+#!/bin/bash
+#
+# Author: Grandt Ashworth (2018)
+# <mailto:git@grandtgruppe.com>
+#
+# The all seeing eye of Sauron sees all
+#
+##########################################
+#
+# Dervivations
+#
+##########################################
+#
+TERM=xterm
+#
+ProgName=$(basename $0)
+TheDate=$(date +%Y%m%d)
+TheTime=$(date +%H:%M:%S)
+#
+BINLIST="sudo whoami timeout dmidecode lsblk crontab lspci ethtool netstat modinfo strings bwconfig ntpdate date wc id ip touch cat grep egrep awk sed uniq tail ifconfig smartctl hpacucli hpsscucli fdisk free nslookup dig uname chmod chown rpm yum apt tee curl ipmitool mv nsupdate MegaCli MegaCli64 mpt-status"
+#
+##########################################
+# Changeable Variables
+##########################################
+#
+WorkDir=$(pwd)
+ReportFile=/var/log/${ProgName}.log
+ArchiveFile=/var/log/${ProgName}.archive
+#
+##########################################
+#
+# Functions
+#
+##########################################
+#
+setupEnv(){
+	for BIN in $BINLIST; do
+		which $BIN >/dev/null 2>&1 && export $(echo ${BIN} | tr "[:lower:]" "[:upper:]")=$BIN
+	done
+	[[ -z $SUDO ]] && {
+		$ECHO "${ProgName} needs sudo to run, please set it up?"
+		exit 1
+		} || {
+		$TIMEOUT 1 $SUDO id >/dev/null 2>&1
+		[[ $? -ne 0 ]] && {
+			$ECHO "${ProgName} needs sudo to run, please set it up?"
+		} || {
+			$SUDO $TOUCH $ReportFile
+			$SUDO $TOUCH $ArchiveFile
+		}
+	}
+}
+#
+acmeLog(){
+        SEVERITY=$1
+        MESSAGE=$2
+        case $SEVERITY in
+                1) STYLE="CRITICAL:"
+                ;;
+                2) STYLE="WARNING:"
+                ;;
+                3) STYLE=""
+                ;;
+                *) STYLE="DEBUG:"
+                ;;
+        esac
+        $ECHO -e "$STYLE $MESSAGE" | $TEE -a ${ReportFile}
+}
+#
+getHostname(){
+	RESULT=$(hostname)
+	[[ "$RESULT" == "localhost" ]] && {
+		acmeLog 1 "HOSTNAME: $RESULT
+	} || {
+		acmeLog 3 "HOSTNAME: $RESULT
+	}
+}
+#
+##########################################
+#
+RUNLIST="setupEnv getHostname"
+#
+for RUN in $RUNLIST; do $RUN; done
+#
+##########################################

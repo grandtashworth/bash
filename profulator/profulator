@@ -46,10 +46,20 @@ acmeLog(){
 checkEnv(){
 	[[ ! -x ${CowSay} ]] && {
 		acmeLog 1 "...found no cows to \"say\" with on $(hostname)... try installing \"cowsay\""
+		acmeLog 1 ""
+		acmeLog 1 "...Hints"
+		acmeLog 1 ""
+		acmeLog 1 "RHEL/Centos: sudo yum -y install cowsay"
+		acmeLog 1 "Manjaro/Arch: sudo pacman -Syy cowsay --noconfirm"
 		exit 1
 	}
 	[[ ! -x ${FortuneCookie} ]] && {
 		acmeLog 1 "...found no fortune cookies on $(hostname)... try installing \"fortune\""
+		acmeLog 1 ""
+		acmeLog 1 "...Hints"
+		acmeLog 1 ""
+		acmeLog 1 "RHEL/Centos: sudo yum -y install fortune"
+		acmeLog 1 "Manjaro/Arch: sudo pacman -Syy fortune-mod --noconfirm"
 		exit 1
 	}
 }
