@@ -1,26 +1,31 @@
 #!/bin/bash
 #
-######################################################################
+#########################################################################
 #
 # Purpose:	Xray Sees Inside
 # Author:	Grandt Ashworth
 # Date:		12/2020
 #
-######################################################################
+#########################################################################
 #
 # Derivations and Declarations
 #
-######################################################################
+#########################################################################
+#
+FUNCTIONHEADERS=no						# yes | no
+#
+#########################################################################
 #
 declare -a _partitionlist=()
 #
-######################################################################
+#########################################################################
 #
 # Functions
 #
-######################################################################
+#########################################################################
 #
 __hostname(){
+	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
 	_hostname=$(hostname -s)
 	#
 	case $_hostname in
@@ -34,6 +39,7 @@ __hostname(){
 }
 #
 __arch(){
+	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
 	_arch=$($(_arch=$(uname -m))
 		[[ ! -z $_arch ]] && { 
 			exit 1
@@ -49,6 +55,7 @@ __arch(){
 }
 #
 __kernel(){
+	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
 	_kernel=$($(_kernel=$(uname -r))
 		[[ ! -z $_kernel ]] && {
 			exit 1
@@ -64,6 +71,7 @@ __kernel(){
 }
 #
 __memory(){
+	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
 	_memory="/proc/meminfo"
 		[[ -z $_memory ]] && {
 			exit 1
@@ -82,34 +90,38 @@ __memory(){
 	}
 }
 #
-#_partitions(){
-#	_partitions="/proc/partitions"
-#	[[ -z $_partitions ]] && {
-#		exit 1
-#		} || {
-#		_partitioncount=$(($(cat $_partitions| wc -l) -2))
-#		while [[ $_partitioncount -ne 0 ]] && {
-#			echo $_partitions | while read LABEL; do
-#				_partitionlist+=($LABEL)
-#				_partioncount=$(( $_partioncount - 1 ))
-#			done
-#		echo $_partitionlist
-#		}
-#	}
-#}
+__partitions(){
+	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
+	_partitions="/proc/partitions"
+	_partitioncount=$(($(cat $_partitions| wc -l) -2))
+	[[ -z $_partitions ]] && {
+		exit 1
+		} || {
+		_partfilelength=$_partitioncount
+		[[ $_partitioncount -ne 0 ]] && {
+			cat $_partitions | tail -n $_partfilelength | awk '{print $4}' | while read LABEL; do
+				_partitionlist+=(${LABEL})
+				_partitioncount=$(( $_partitioncount - 1 ))
+				[[ $_partitioncount -eq 0 ]] && {
+					echo ${_partitionlist[@]}
+				}
+			done
+		}
+	}
+}
 #
-######################################################################
+#########################################################################
 #
 # Main Loop
 #
-######################################################################
+#########################################################################
 #
-RUNLIST="__hostname __arch __kernel __memory"
+RUNLIST="__hostname __arch __kernel __memory __partitions"
 #
 for RUN in $RUNLIST; do $RUN; done
 #
-######################################################################
+#########################################################################
 #
 # Housekeeping
 #
-######################################################################
+#########################################################################
