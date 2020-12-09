@@ -12,7 +12,7 @@
 #
 #########################################################################
 #
-FUNCTIONHEADERS=no						# yes | no
+FUNCTIONHEADERS=yes	# yes | no
 #
 #########################################################################
 #
@@ -24,78 +24,137 @@ declare -a _partitionlist=()
 #
 #########################################################################
 #
+__acmelogger(){
+	_acmeloglevel=$1
+	_acmelogmessage=$2
+	[[ $_acmeloglevel =~ ^[1-5]+$ ]] && {
+        	case "$_acmeloglevel" in
+        	        1)	_acmestyle="! "		#ERROR
+				exit 1
+			;;
+        	        2)	_acmestyle="- "		#WARNING
+			;;
+        	        3)	_acmestyle=""		#INFORMATIONAL
+			;;
+               		4)	_acmestyle="DEB "	#DEBUG
+			;;
+                	5)	_acmestyle="\m/ "	#THEFUTURE
+			;;
+		esac
+		echo -e "$_acmestyle $_acmelogmessage"
+	} || {
+		echo -e "! '$_acmestyle' invalid style input for log message \"$_acmelogmessage\""
+	}
+}
+#
 __hostname(){
 	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
+	_FNC=${FUNCNAME[0]}
 	_hostname=$(hostname -s)
 	#
 	case $_hostname in
 		localhost)
-		exit 1
+			__acmelogger 1 "...something went wrong in $_FNC"
 		;;
 		*)
-		echo $_hostname
+			__acmelogger 3 "HOSTNAME: $_hostname"
 		;;
 	esac
+	exit_status=$?
+	[[ $exit_status -ne 0 ]] && {
+		__acmelogger 1 "... $_FNC failed."
+	}
 }
 #
 __arch(){
 	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
-	_arch=$($(_arch=$(uname -m))
-		[[ ! -z $_arch ]] && { 
-			exit 1
-			} || { 
-			echo $($(which uname) -m)
-		})
-		exit_status=$?
-	[[ $exit_status -eq 0 ]] && {
-		echo $_arch
-	} || {
-		exit 1
+	_FNC=${FUNCNAME[0]}
+	_arch=$(uname -m)
+	[[ -z $_arch ]] && {
+		__acmelogger 1 "...something went wrong in $_FNC"
+	} || { 
+		__acmelogger 3 "ARCH: $($(which uname) -m)"
+	}
+	exit_status=$?
+	[[ $exit_status -ne 0 ]] && {
+		__acmelogger 1 "... $_FNC failed."
 	}
 }
 #
 __kernel(){
 	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
-	_kernel=$($(_kernel=$(uname -r))
-		[[ ! -z $_kernel ]] && {
-			exit 1
-			} || {
-			echo $($(which uname) -r)
-		})
-		exit_status=$?
-	[[ $exit_status -eq 0 ]] && {
-		echo $_kernel
+	_FNC=${FUNCNAME[0]}
+	_kernel=$(uname -r)
+	[[ -z $_kernel ]] && {
+		__acmelogger 1 "...something went wrong in $_FNC"
 	} || {
-		exit 1
+		__acmelogger 3 "KERNEL: $($(which uname) -r))"
+	}
+	exit_status=$?
+	[[ $exit_status -ne 0 ]] && {
+		__acmelogger 1 "... $_FNC failed."
 	}
 }
 #
 __memory(){
 	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
+	_FNC=${FUNCNAME[0]}
 	_memory="/proc/meminfo"
-		[[ -z $_memory ]] && {
-			exit 1
-			} || {
-			_totalmemory=$(cat $_memory|awk '/MemTotal:/{print $2}')
-			_totalmemoryfree=$(cat $_memory|awk '/MemFree:/{print $2}')
-			_totalmemoryavailable=$(cat $_memory|awk '/MemAvailable:/{print $2}')
-			_totalswap=$(cat $_memory|awk '/SwapTotal:/{print $2}')
-			_totalswapfree=$(cat $_memory|awk '/SwapFree:/{print $2}')
-			}
-			exit_status=$?
-	[[ $exit_status -eq 0 ]] && {
-		echo $_totalmemory $_totalmemoryfree $_totalmemoryavailable $_totalswap $_totalswapfree
+	[[ -z $_memory ]] && {
+		__acmelogger 1 "...something went wrong in $_FNC"
 	} || {
-		exit 1
+		_totalmemory=$(cat $_memory|awk '/MemTotal:/{print $2}')
+		_totalmemoryfree=$(cat $_memory|awk '/MemFree:/{print $2}')
+		_totalmemoryavailable=$(cat $_memory|awk '/MemAvailable:/{print $2}')
+		_totalswap=$(cat $_memory|awk '/SwapTotal:/{print $2}')
+		_totalswapfree=$(cat $_memory|awk '/SwapFree:/{print $2}')
 	}
+	exit_status=$?
+	[[ $exit_status -ne 0 ]] && {
+		__acmelogger 1 "... $_FNC failed."
+	} || {
+		__acmelogger 3 "MEM TOTAL: $_totalmemory"
+		__acmelogger 3 "MEM FREE: $_totalmemoryfree"
+		__acmelogger 3 "MEM AVAIL: $_totalmemoryavailable"
+		__acmelogger 3 "SWAP TOTAL: $_totalswap"
+		__acmelogger 3 "SWAP FREE: $_totalswapfree"
+	}
+}
+#
+__cpus(){
+	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
+	_FNC=${FUNCNAME[0]}
+	_cpus="/proc/cpuinfo"
+	[[ -z $_cpus ]] && {
+		__acmelogger 1 "...something went wrong in $_FNC"
+	} || {
+		_cpuvendor=$(cat $_cpus|awk -F":" '/vendor_id/{print $2}'|sed 's/^\ //g'|sort -u)
+		_cputype=$(cat $_cpus|awk -F":" '/model name/{print $2}'|sed 's/^\ //g'|sort -u)
+		_cpuspeeds=$(echo -n $(cat $_cpus|awk -F":" '/cpu MHz/{print $2}'|sed 's/^\ //g'|sort -u))
+		_cpusockets=$(echo -n $(cat $_cpus|awk -F":" '/physical id/{print $2}'|sed 's/^\ //g'|sort -u))
+		_cpuids=$(echo -n $(cat $_cpus|awk -F":" '/core id/{print $2}'|sed 's/^\ //g'|sort -u))
+		_cpucores=$(cat $_cpus|awk -F":" '/cpu cores/{print $2}'|sed 's/^\ //g'|sort -u)
+	}
+	exit_status=$?
+        [[ $exit_status -ne 0 ]] && {
+		__acmelogger 1 "... $_FNC failed."
+        } || {
+                __acmelogger 3 "CPU VENDOR: $_cpuvendor"
+                __acmelogger 3 "CPU TYPE: $_cputype"
+                __acmelogger 3 "CPU SPEEDS: $_cpuspeeds"
+                __acmelogger 3 "CPU SOCKETS: $_cpusockets"
+                __acmelogger 3 "CPU IDS: $_cpuids"
+                __acmelogger 3 "CPU CORES: $_cpucores"
+        }
 }
 #
 __partitions(){
 	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
+	_FNC=${FUNCNAME[0]}
 	_partitions="/proc/partitions"
 	_partitioncount=$(($(cat $_partitions| wc -l) -2))
 	[[ -z $_partitions ]] && {
-		exit 1
+		__acmelogger 1 "...something went wrong in $_FNC"
 		} || {
 		_partfilelength=$_partitioncount
 		[[ $_partitioncount -ne 0 ]] && {
@@ -103,11 +162,31 @@ __partitions(){
 				_partitionlist+=(${LABEL})
 				_partitioncount=$(( $_partitioncount - 1 ))
 				[[ $_partitioncount -eq 0 ]] && {
-					echo ${_partitionlist[@]}
+					_parts=$(echo -n ${_partitionlist[@]})
+					__acmelogger 3 "PARTITIONS: $_parts"
 				}
 			done
 		}
 	}
+	exit_status=$?
+        [[ $exit_status -ne 0 ]] && {
+		__acmelogger 1 "... $_FNC failed."
+        }
+}
+#
+__interfaces(){
+	[[ "${FUNCTIONHEADERS}" == "yes" ]] && echo ${FUNCNAME[0]}
+	_FNC=${FUNCNAME[0]}
+	_interfacelist=$(echo -n $(ls /sys/class/net))
+	[[ -z $_interfacelist ]] && {
+		__acmelogger 1 "...something went wrong in $_FNC"
+	} || {
+		__acmelogger 3 "INTERFACES: $_interfacelist"
+	}
+	exit_status=$?
+        [[ $exit_status -ne 0 ]] && {
+		__acmelogger 1 "... $_FNC failed."
+        }
 }
 #
 #########################################################################
@@ -116,7 +195,7 @@ __partitions(){
 #
 #########################################################################
 #
-RUNLIST="__hostname __arch __kernel __memory __partitions"
+RUNLIST="__hostname __arch __kernel __memory __cpus __partitions __interfaces"
 #
 for RUN in $RUNLIST; do $RUN; done
 #
