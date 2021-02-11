@@ -3,7 +3,7 @@
 # Author: Grandt Ashworth (2018)
 # <mailto:git@grandtgruppe.com>
 #
-# Add the profulator to your ~/.bashrc
+# Add the profulator to your ~/.bash_profile
 #
 # If it's not working, check your syslogs
 #
